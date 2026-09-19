@@ -27,7 +27,7 @@ class PlatoSerializer(serializers.ModelSerializer):
         fields = ('id', 'nombre', 'precio', 'disponible')
 
     def get_disponible(self, obj):
-        return obj.disponible() if callable(obj.disponible) else bool(obj.disponible)
+        return bool(obj.disponible)
 
 
 class PedidoSerializer(serializers.ModelSerializer):
