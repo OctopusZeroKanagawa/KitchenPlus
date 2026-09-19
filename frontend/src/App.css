@@ -1,0 +1,26 @@
+.top-nav {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: #111827;
+}
+
+.top-nav a {
+  color: #f9fafb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.top-nav a.active {
+  text-decoration: underline;
+}
+
+.page-shell {
+  padding: 2rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  color: #111827;
+}
