@@ -12,11 +12,12 @@ class MesaSerializer(serializers.ModelSerializer):
 
 class ItemPedidoSerializer(serializers.ModelSerializer):
     plato_nombre = serializers.CharField(source='plato.nombre', read_only=True)
+    mesa_numero = serializers.IntegerField(source='pedido.mesa.numero', read_only=True)
 
     class Meta:
         model = ItemPedido
-        fields = ('id', 'pedido', 'plato', 'plato_nombre', 'cantidad', 'precio_unitario', 'estado', 'creado')
-        read_only_fields = ('precio_unitario', 'creado', 'plato_nombre')
+        fields = ('id', 'pedido', 'plato', 'plato_nombre', 'mesa_numero', 'cantidad', 'precio_unitario', 'estado', 'creado')
+        read_only_fields = ('precio_unitario', 'creado', 'plato_nombre', 'mesa_numero')
 
 
 class PlatoSerializer(serializers.ModelSerializer):
