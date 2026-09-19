@@ -1,0 +1,6 @@
+# Virtual environment
+backend/.venv/
+
+# Byte-compiled / cached
+__pycache__/
+*.py[cod]
