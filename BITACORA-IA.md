@@ -121,3 +121,86 @@ cola de cocina → cambiar estado de un ítem.
   a fondo.
 - No hay tests automatizados para estos endpoints todavía — la
   verificación fue manual con `curl`.
+
+## Sesión 3 — [19 de Septiembre del 2026]
+
+**Herramienta:** GitHub Copilot (Agent Mode, VS Code)
+**Contexto dado:** `AGENTS.md` + `ASSUMPTIONS.md`
+
+**Se pidió:**
+
+1. Configurar CORS en el backend para que el frontend en desarrollo
+   (Vite) pudiera consumir la API.
+2. Crear el proyecto frontend con Vite + React, con dos pantallas
+   (`CrearPedido`, `ColaCocina`) y navegación simple.
+3. Agregar endpoints de solo lectura `GET /api/mesas/` y
+   `GET /api/platos/` para poblar el formulario.
+4. Implementar `CrearPedido`: formulario que consume `mesas`/`platos`
+   y envía `POST /api/pedidos/`.
+5. Implementar `ColaCocina`: polling cada 5s a `GET /api/cocina/cola/`,
+   con botón para avanzar el estado de cada ítem vía PATCH.
+
+**Qué propuso el agente y qué se corrigió:**
+
+- **CORS**: primer intento solo permitía `http://localhost:5173`.
+  Falló en el navegador real porque Vite abrió en `127.0.0.1:5173`
+  en este entorno — se agregó ese segundo origen tras diagnosticarlo
+  con Playwright (consola del navegador mostró el error de CORS).
+- **`mesas`/`platos`**: en la primera verificación del endpoint de
+  platos, el único plato de prueba no tenía receta asociada, así que
+  `disponible` salía `true` de forma trivial (lista vacía). Se pidió
+  crear un ingrediente con stock 0 y asociarlo, confirmando que
+  `disponible` pasaba a `false` y volvía a `true` al reponer stock —
+  antes de eso no había evidencia real de que el cálculo funcionara.
+- **Código muerto detectado y removido**: `PlatoSerializer.get_disponible`
+  tenía una rama `callable(obj.disponible)` que nunca se ejecuta
+  porque `disponible` es una `@property`, no un método. Se simplificó
+  a `bool(obj.disponible)`.
+- **`ItemPedidoSerializer` sin dato útil para cocina**: exponía
+  `pedido` (el ID), no el número de mesa. Se agregó el campo
+  `mesa_numero` vía `source='pedido.mesa.numero'`, verificado con
+  curl mostrando que dos ítems de pedidos distintos con la misma mesa
+  reportaban el mismo `mesa_numero` (prueba de que no estaba
+  hardcodeado).
+- **Discrepancia repetida entre "resumen" y código real**: en más de
+  una ocasión, lo que el agente describió como el contenido del
+  archivo no coincidía con el diff real generado después (faltaba el
+  `<h1>` de `ColaCocina`, y el mensaje de error había dejado de ser
+  condicional — se habría mostrado un recuadro de error vacío en todo
+  momento). Se detectó pidiendo explícitamente el diff real en vez de
+  aceptar el resumen, y se corrigió antes de comitear.
+- **Verificación real vs. build**: un "build exitoso" (`npm run build`)
+  no demuestra que la funcionalidad funcione en el navegador. Se pidió
+  verificación real con Playwright (headless) en varios puntos, lo
+  cual sí sacó a la luz el problema de CORS con `127.0.0.1` que un
+  build nunca habría detectado.
+
+**Qué se aceptó:**
+
+- Todas las correcciones anteriores, tras confirmar cada una con
+  evidencia directa (diff real o prueba en navegador), no con el
+  resumen del agente.
+- El flujo end-to-end completo (crear pedido → aparece en cola →
+  avanza de estado → desaparece al llegar a "listo"), verificado con
+  un script de Playwright que crea un pedido real y sigue su ciclo de
+  vida completo en la interfaz.
+- No usar ramas de git por el tiempo limitado de la prueba (ver nota
+  en `ASSUMPTIONS.md`, sección "Decisiones de proceso").
+
+**Qué se corrigió como hábito de trabajo:**
+
+- Se dejó de aceptar resúmenes del agente como evidencia suficiente;
+  desde la mitad de esta sesión, cada cambio se confirmó pidiendo el
+  diff real (`git diff`) o la salida cruda de comandos/pruebas, nunca
+  la descripción que el agente hace de sí mismo.
+- Se instaló y desinstaló Playwright dos veces (una por sesión de
+  prueba) para no dejarlo como dependencia permanente del proyecto.
+
+**Qué quedó sin verificar:**
+
+- No se revisó si el polling de 5 segundos maneja bien el caso de
+  que la pestaña quede en segundo plano por mucho tiempo (los
+  navegadores pueden limitar timers en pestañas inactivas). No es
+  crítico para la demo pero podría afectar un uso prolongado real.
+- La base de datos de desarrollo quedó con datos residuales de varias
+  sesiones de prueba; falta limpiarla antes de la demo final.
