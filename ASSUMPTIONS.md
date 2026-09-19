@@ -40,3 +40,14 @@ directamente, para el Sistema E (pedidos y cocina de restaurante).
   que el sistema modele una situación irreal de cola infinita. Al llegar
   al límite, el sistema no debería permitir agregar nuevos ítems hasta
   que la cola baje.
+
+## Decisiones de proceso
+
+- Se consideró trabajar con ramas de git (una por funcionalidad) como
+  buena práctica de flujo de trabajo en equipo. Se descartó por el
+  tiempo limitado de la prueba individual: para esta semana, un
+  historial lineal en `main`, con commits pequeños y bien
+  documentados, da la misma trazabilidad que exige el enunciado sin
+  el costo de gestionar merges. Con más de un desarrollador o más
+  tiempo disponible, ramas por feature habría sido la elección
+  correcta.
