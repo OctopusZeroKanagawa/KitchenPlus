@@ -185,8 +185,158 @@ function CrearPedido() {
   )
 }
 
+const estadoLabels = {
+  pendiente: 'Pendiente',
+  en_preparacion: 'En preparación',
+  listo: 'Listo',
+  entregado: 'Entregado',
+  cancelado: 'Cancelado',
+}
+
+const estadoOrden = ['pendiente', 'en_preparacion', 'listo']
+
+const getSiguienteEstado = (estadoActual) => {
+  const indexActual = estadoOrden.indexOf(estadoActual)
+  if (indexActual === -1 || indexActual === estadoOrden.length - 1) {
+    return null
+  }
+  return estadoOrden[indexActual + 1]
+}
+
+const formatearTiempo = (isoDate) => {
+  const diffMs = Date.now() - new Date(isoDate).getTime()
+  const segundos = Math.max(0, Math.floor(diffMs / 1000))
+
+  if (segundos < 60) {
+    return `hace ${segundos} s`
+  }
+
+  const minutos = Math.floor(segundos / 60)
+  if (minutos < 60) {
+    return `hace ${minutos} min`
+  }
+
+  const horas = Math.floor(minutos / 60)
+  return `hace ${horas} h`
+}
+
 function ColaCocina() {
-  return <h1>ColaCocina</h1>
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [updatingId, setUpdatingId] = useState(null)
+
+  const refreshQueue = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/cocina/cola/')
+      if (!response.ok) {
+        throw new Error('No se pudo cargar la cola de cocina.')
+      }
+
+      const data = await response.json()
+      setItems(Array.isArray(data) ? data : [])
+      setErrorMessage('')
+    } catch (error) {
+      setErrorMessage(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refreshQueue()
+
+    const intervalId = setInterval(() => {
+      refreshQueue()
+    }, 5000)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [])
+
+  const handleAdvance = async (item) => {
+    const siguienteEstado = getSiguienteEstado(item.estado)
+    if (!siguienteEstado) {
+      return
+    }
+
+    setUpdatingId(item.id)
+    setErrorMessage('')
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/items/${item.id}/estado/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ estado: siguienteEstado }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const detail = Array.isArray(data.detail)
+          ? data.detail.join(', ')
+          : data.detail || 'No se pudo actualizar el estado.'
+        throw new Error(detail)
+      }
+
+      await refreshQueue()
+    } catch (error) {
+      setErrorMessage(error.message)
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  return (
+    <div className="cocina-container">
+      <h1>Cola de cocina</h1>
+
+      {errorMessage && <div className="message error">{errorMessage}</div>}
+
+      {loading ? (
+        <p>Cargando cola...</p>
+      ) : items.length === 0 ? (
+        <p>No hay ítems pendientes.</p>
+      ) : (
+        <ul className="cola-list">
+          {items.map((item) => {
+            const siguienteEstado = getSiguienteEstado(item.estado)
+
+            return (
+              <li key={item.id} className="cola-item">
+                <div className="cola-item-header">
+                  <strong>{item.plato_nombre}</strong>
+                  <span className="cantidad-badge">{item.cantidad}x</span>
+                </div>
+
+                <div className="cola-item-meta">
+                  <span>Mesa {item.mesa_numero}</span>
+                  <span>{estadoLabels[item.estado] || item.estado}</span>
+                  <span>{formatearTiempo(item.creado)}</span>
+                </div>
+
+                {siguienteEstado && (
+                  <button
+                    type="button"
+                    className="advance-button"
+                    onClick={() => handleAdvance(item)}
+                    disabled={updatingId === item.id}
+                  >
+                    {updatingId === item.id
+                      ? 'Actualizando...'
+                      : `Avanzar a ${estadoLabels[siguienteEstado]}`}
+                  </button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 function App() {
