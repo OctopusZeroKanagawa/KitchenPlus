@@ -63,9 +63,10 @@ Cola de cocina: ítems pendientes de preparación, ordenados por antigüedad
 
 ## Estado actual del proyecto
 
-- [ ] Repositorio creado
-- [ ] Modelo de datos definido
-- [ ] Backend Django levantado
+- [x] Repositorio creado
+- [x] Modelo de datos definido
+- [x] Backend Django levantado
+- [x] API del flujo pedido → cola → estado (probada con curl)
 - [ ] Frontend React levantado
-- [ ] Primer ADR (elección de herramienta de IA)
-- [ ] Flujo end-to-end funcionando
+- [x] ADR (3 hasta ahora: elección de herramienta de IA, estado de preparación, modelo de inventario)
+- [ ] Flujo end-to-end funcionando (falta conectar el frontend a la API)

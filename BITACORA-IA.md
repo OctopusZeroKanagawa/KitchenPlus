@@ -60,3 +60,64 @@ quedó sin verificar.
   en las reglas de negocio, pero no se confirmó con un diff detallado.
 - No se corrieron tests automatizados todavía — solo se verificó que
   las migraciones aplicaran sin error.
+
+## Sesión 2 — [19 de Septiembre del 2026]
+
+**Herramienta:** GitHub Copilot (Agent Mode, VS Code)
+**Contexto dado:** `AGENTS.md` + `ASSUMPTIONS.md`
+
+**Se pidió:**
+Construir la capa de API (serializers + vistas con APIView/generics,
+sin ViewSets ni routers) para el flujo priorizado: crear pedido → ver
+cola de cocina → cambiar estado de un ítem.
+
+**Qué propuso el agente (primer intento):**
+
+- `PedidoSerializer`, `ItemPedidoSerializer`, vistas para los 4
+  endpoints y las urls correspondientes.
+
+**Qué se detectó al revisar antes de comitear:**
+
+1. **Bug que rompe en tiempo de ejecución:** `PedidoSerializer` tenía
+   un campo `items` con `source='items'` — nombre y source idénticos,
+   lo cual DRF rechaza con `AssertionError` apenas se use el
+   serializer. No se detectó leyendo el código en abstracto, sino
+   pidiendo explícitamente una prueba real con `curl` contra el
+   servidor corriendo.
+2. **Regla de negocio no aplicada:** al crear los ítems de un pedido
+   nuevo, se usaba `.save()` en vez de `.full_clean()` + `.save()`,
+   por lo que el límite de 100 ítems en cola (definido en
+   `ItemPedido.clean()`) no se validaba al crear pedidos, solo al
+   cambiar el estado de un ítem existente.
+3. **Valor de estado corrupto:** en una corrección posterior, un ítem
+   quedó guardado con `estado="pending"` (inglés) en vez de
+   `"pendiente"`. Django no valida `choices` a nivel de base de
+   datos, así que el registro se guardó sin error pero quedaba
+   invisible para cualquier filtro que comparara contra `"pendiente"`.
+   Se investigó con `git log --all -- views.py`, confirmando que el
+   bug nunca llegó a comitearse — ocurrió solo en memoria durante la
+   edición. Se resolvió recreando la base de datos de desarrollo
+   desde cero (sin datos reales que perder) y repitiendo las pruebas.
+4. **Intento de commit sin autorización:** durante el diagnóstico del
+   punto 3, el agente ejecutó `git commit` con `|| true` antes de
+   preguntar si debía comitear — la pregunta posterior era sobre algo
+   que ya había intentado hacer. Se le indicó explícitamente no
+   volver a comitear sin confirmación, incluso durante diagnósticos.
+
+**Qué se aceptó:**
+
+- Las correcciones de los 3 bugs, una vez verificadas con peticiones
+  `curl` reales (no solo con la palabra del agente) contra una base de
+  datos limpia.
+- Un solo commit para toda la capa de API (en vez de 3 por endpoint),
+  porque los archivos son interdependientes y un commit intermedio
+  habría dejado código roto en el historial.
+
+**Qué quedó sin verificar:**
+
+- No se identificó la causa exacta de por qué apareció `"pending"` en
+  inglés (el agente no la explicó, solo confirmó que nunca se comiteó
+  y que la corrección funciona). Si vuelve a aparecer, investigar más
+  a fondo.
+- No hay tests automatizados para estos endpoints todavía — la
+  verificación fue manual con `curl`.
