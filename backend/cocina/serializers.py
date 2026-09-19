@@ -19,6 +19,17 @@ class ItemPedidoSerializer(serializers.ModelSerializer):
         read_only_fields = ('precio_unitario', 'creado', 'plato_nombre')
 
 
+class PlatoSerializer(serializers.ModelSerializer):
+    disponible = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Plato
+        fields = ('id', 'nombre', 'precio', 'disponible')
+
+    def get_disponible(self, obj):
+        return obj.disponible() if callable(obj.disponible) else bool(obj.disponible)
+
+
 class PedidoSerializer(serializers.ModelSerializer):
     items = ItemPedidoSerializer(many=True, read_only=True)
     items_to_create = serializers.ListField(

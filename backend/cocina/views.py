@@ -6,8 +6,18 @@ from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .models import Pedido, ItemPedido, Plato
-from .serializers import PedidoSerializer, ItemPedidoSerializer
+from .models import Pedido, ItemPedido, Plato, Mesa
+from .serializers import PedidoSerializer, ItemPedidoSerializer, MesaSerializer, PlatoSerializer
+
+
+class MesaListView(generics.ListAPIView):
+    queryset = Mesa.objects.all().order_by('numero')
+    serializer_class = MesaSerializer
+
+
+class PlatoListView(generics.ListAPIView):
+    queryset = Plato.objects.all().order_by('nombre')
+    serializer_class = PlatoSerializer
 
 
 class PedidoCreateView(APIView):
