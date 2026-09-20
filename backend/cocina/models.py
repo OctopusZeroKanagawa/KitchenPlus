@@ -44,6 +44,11 @@ class Mesa(models.Model):
     numero = models.PositiveIntegerField(unique=True)
     capacidad = models.PositiveIntegerField()
 
+    @property
+    def total_pendiente(self):
+        total = sum((pedido.subtotal for pedido in self.pedidos.filter(pagado=False)), Decimal('0.00'))
+        return total
+
     def __str__(self):
         return f"Mesa {self.numero}"
 

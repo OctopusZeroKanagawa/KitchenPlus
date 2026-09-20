@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -6,8 +8,15 @@ from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .models import Pedido, ItemPedido, Plato, Mesa
-from .serializers import PedidoSerializer, ItemPedidoSerializer, MesaSerializer, PlatoSerializer
+from .models import Pedido, ItemPedido, Plato, Mesa, Pago
+from .serializers import (
+    PedidoSerializer,
+    ItemPedidoSerializer,
+    MesaSerializer,
+    PlatoSerializer,
+    PagoSerializer,
+    MesaCuentaSerializer,
+)
 
 
 class MesaListView(generics.ListAPIView):
@@ -90,3 +99,60 @@ class ItemEstadoUpdateView(APIView):
             return Response({'detail': e.messages}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(ItemPedidoSerializer(item).data)
+
+
+class PagoCreateView(APIView):
+    """POST /api/pagos/ -> create payments for an order or the whole table"""
+
+    def post(self, request, *args, **kwargs):
+        mesa_id = request.data.get('mesa')
+        pedido_id = request.data.get('pedido')
+        monto_raw = request.data.get('monto')
+
+        if mesa_id is None:
+            return Response({'detail': 'Field "mesa" is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if monto_raw is None:
+            return Response({'detail': 'Field "monto" is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        mesa = get_object_or_404(Mesa, pk=mesa_id)
+
+        try:
+            monto = Decimal(str(monto_raw))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({'detail': 'Field "monto" must be a valid number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if monto <= 0:
+            return Response({'detail': 'Field "monto" must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            if pedido_id is not None and pedido_id != '':
+                pedido = get_object_or_404(Pedido, pk=pedido_id)
+                if pedido.mesa_id != mesa.id:
+                    return Response({'detail': 'El pedido no pertenece a la mesa indicada.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                pago = Pago.objects.create(mesa=mesa, pedido=pedido, monto=monto)
+                total_pagado = sum((pago_item.monto for pago_item in pedido.pagos.all()), Decimal('0.00'))
+                if total_pagado >= pedido.subtotal:
+                    pedido.pagado = True
+                    pedido.save(update_fields=['pagado'])
+                return Response(PagoSerializer(pago).data, status=status.HTTP_201_CREATED)
+
+            total_pendiente = mesa.total_pendiente
+            if monto < total_pendiente:
+                diferencia = total_pendiente - monto
+                detalle = (
+                    f'Monto insuficiente para pagar el total de la mesa, '
+                    f'faltan {diferencia}. Paga un pedido individual o cubre el monto completo.'
+                )
+                return Response({'detail': detalle}, status=status.HTTP_400_BAD_REQUEST)
+
+            pago = Pago.objects.create(mesa=mesa, pedido=None, monto=monto)
+            for pedido in mesa.pedidos.filter(pagado=False).select_for_update():
+                pedido.pagado = True
+                pedido.save(update_fields=['pagado'])
+            return Response(PagoSerializer(pago).data, status=status.HTTP_201_CREATED)
+
+
+class MesaCuentaView(generics.RetrieveAPIView):
+    queryset = Mesa.objects.all()
+    serializer_class = MesaCuentaSerializer

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 
-from .models import Mesa, Pedido, ItemPedido, Plato
+from .models import Mesa, Pedido, ItemPedido, Plato, Pago
 
 
 class MesaSerializer(serializers.ModelSerializer):
@@ -45,3 +45,37 @@ class PedidoSerializer(serializers.ModelSerializer):
 
     def get_subtotal(self, obj):
         return obj.subtotal
+
+
+class PagoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Pago
+        fields = ('id', 'mesa', 'pedido', 'monto', 'fecha')
+        read_only_fields = ('id', 'fecha')
+
+
+class PedidoCuentaSerializer(serializers.ModelSerializer):
+    subtotal = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Pedido
+        fields = ('id', 'subtotal')
+
+    def get_subtotal(self, obj):
+        return obj.subtotal
+
+
+class MesaCuentaSerializer(serializers.ModelSerializer):
+    pedidos = serializers.SerializerMethodField()
+    total_pendiente = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Mesa
+        fields = ('numero', 'pedidos', 'total_pendiente')
+
+    def get_pedidos(self, obj):
+        pedidos = obj.pedidos.filter(pagado=False).order_by('creado')
+        return PedidoCuentaSerializer(pedidos, many=True).data
+
+    def get_total_pendiente(self, obj):
+        return obj.total_pendiente

@@ -1,8 +1,9 @@
+from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
-from cocina.models import Mesa, Plato, ItemPedido
+from cocina.models import Mesa, Plato, ItemPedido, Pedido
 import time
 
 
@@ -90,3 +91,54 @@ class CocinaAPITestCase(TestCase):
         returned_ids = [it['id'] for it in data]
         # earliest first
         self.assertEqual(returned_ids[:3], ids)
+
+    def test_pago_individual_completo(self):
+        resp = self._create_pedido()
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        pedido = Pedido.objects.get(pk=resp.json()['id'])
+
+        pago_resp = self.client.post(
+            '/api/pagos/',
+            {'mesa': self.mesa.id, 'pedido': pedido.id, 'monto': str(pedido.subtotal)},
+            format='json'
+        )
+
+        self.assertEqual(pago_resp.status_code, status.HTTP_201_CREATED)
+        pedido.refresh_from_db()
+        self.assertTrue(pedido.pagado)
+
+    def test_pago_total_insuficiente(self):
+        first = self._create_pedido()
+        second = self._create_pedido(cantidad=2)
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+
+        mesa_total = self.mesa.total_pendiente
+        payment = self.client.post(
+            '/api/pagos/',
+            {'mesa': self.mesa.id, 'monto': str(mesa_total - Decimal('1.00'))},
+            format='json'
+        )
+
+        self.assertEqual(payment.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Monto insuficiente para pagar el total de la mesa', payment.json()['detail'])
+
+        for pedido in self.mesa.pedidos.all():
+            self.assertFalse(pedido.pagado)
+
+    def test_pago_total_completo(self):
+        first = self._create_pedido()
+        second = self._create_pedido(cantidad=2)
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+
+        total = self.mesa.total_pendiente
+        payment = self.client.post(
+            '/api/pagos/',
+            {'mesa': self.mesa.id, 'monto': str(total)},
+            format='json'
+        )
+
+        self.assertEqual(payment.status_code, status.HTTP_201_CREATED)
+        for pedido in self.mesa.pedidos.all():
+            self.assertTrue(pedido.pagado)
