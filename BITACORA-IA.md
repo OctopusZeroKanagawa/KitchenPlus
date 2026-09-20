@@ -204,3 +204,92 @@ cola de cocina → cambiar estado de un ítem.
   crítico para la demo pero podría afectar un uso prolongado real.
 - La base de datos de desarrollo quedó con datos residuales de varias
   sesiones de prueba; falta limpiarla antes de la demo final.
+
+## Sesión 4 — [19 de Septiembre del 2026]
+
+**Herramienta:** GitHub Copilot (Agent Mode, VS Code)
+**Contexto dado:** `AGENTS.md` + `ASSUMPTIONS.md`
+
+**Se pidió:**
+
+1. Implementar la regla de pagos parciales (una de las 4 reglas de
+   negocio obligatorias, hasta entonces solo modelada, sin API): pago
+   individual por pedido y pago del total de una mesa.
+2. Pantalla `PagarMesa` en el frontend para esa funcionalidad.
+3. Redactar `README.md` en la raíz con instrucciones de instalación.
+
+**Qué propuso el agente y qué se verificó:**
+
+- **API de pagos**: `POST /api/pagos/` con la lógica exacta pedida
+  (pago individual marca `pagado` al cubrir el subtotal; pago total
+  rechaza montos insuficientes con mensaje claro y marca todos los
+  pedidos no pagados de la mesa al cubrirse). Se agregó
+  `Mesa.total_pendiente` y `GET /api/mesas/<id>/cuenta/`. 8 tests
+  (3 nuevos de pago) pasando.
+- **Discrepancia diff vs. salida pegada**: al revisar el diff de los
+  tests, una línea de `test_pago_total_completo` parecía tener un
+  `self.client.post()` sin la URL como primer argumento — lo cual
+  habría hecho fallar el test, contradiciendo el "ok" reportado. Se
+  pidió el contenido exacto del archivo con `cat -A` y la ejecución
+  aislada de ese test: el archivo real sí tenía la URL correcta: fue
+  un error de transcripción en el mensaje anterior, no un bug real.
+- **Pruebas de frontend con "trampas" ocultas (dos veces)**: al pedir
+  verificar en navegador el caso de "pago total insuficiente":
+  1. Primer intento: interceptó `window.fetch` para devolver una
+     respuesta 400 fabricada por el propio script, sin que la
+     petición llegara al backend real.
+  2. Segundo intento (tras señalar el problema): inyectó un `<div>`
+     con el mensaje de error directamente en el DOM con
+     `document.createElement`, en vez de hacer clic en el botón real
+     y dejar que el componente React lo procesara — la petición al
+     backend sí fue real esta vez, pero la parte de "así se ve en
+     pantalla" seguía siendo simulada.
+  3. Al pedir la versión sin ningún atajo (clic real en el botón
+     `pagarTotalMesa`), el agente identificó correctamente que **el
+     escenario no es alcanzable desde la UI actual**: el botón
+     siempre envía `cuenta.total_pendiente` exacto, calculado por el
+     propio backend, por lo que nunca puede generar un monto
+     insuficiente por diseño. Se documentó esto con un comentario en
+     el código en vez de forzar una prueba artificial.
+- **Verificación del README ("correr desde cero")**: se pidió clonar
+  el repo en una carpeta temporal y seguir las instrucciones al pie
+  de la letra. Un primer intento devolvió una mesa existente en un
+  clon supuestamente vacío — se sospechó que `db.sqlite3` estaba
+  mal trackeado en git a pesar del `.gitignore` (`git log --all` lo
+  descartó: el archivo nunca se comiteó) y luego que había una
+  colisión de puerto con el servidor de desarrollo real (`lsof`/`ss`
+  también lo descartaron: no había nada escuchando en 8000/5173 en
+  ese momento). Repitiendo la verificación en puertos alternativos
+  (8001/5174) desde un clon nuevo, la API sí devolvió `[]` real. La
+  causa exacta de la primera "mesa fantasma" quedó sin explicación
+  definitiva, pero la verificación final es sólida.
+
+**Qué se aceptó:**
+
+- La API y los tests de pagos, sin cambios adicionales.
+- La pantalla `PagarMesa`, con la nota en el código explicando por
+  qué el caso de error de monto insuficiente no es alcanzable desde
+  ese botón.
+- El `README.md`, tras confirmar con una verificación limpia y sin
+  ambigüedad que sus instrucciones funcionan de punta a punta.
+
+**Qué se corrigió como hábito de trabajo:**
+
+- Se reforzó la lección de la sesión anterior: una "prueba en
+  navegador" solo cuenta como evidencia real si el clic ocurre sobre
+  el elemento real de la UI y la petición llega sin interceptar al
+  backend real. Se rechazaron dos intentos que no cumplían esto antes
+  de aceptar el tercero.
+- Ante una discrepancia entre lo reportado y la evidencia, se
+  verificó con la fuente más directa posible en cada caso (`cat -A`
+  del archivo, `git log --all`, `lsof`/`ss`) en vez de asumir cuál de
+  las dos versiones era la correcta.
+
+**Qué quedó pendiente para la próxima sesión:**
+
+- Revisar/mejorar la parte visual del frontend (hasta ahora
+  priorizada la funcionalidad sobre el diseño).
+- Confirmar si falta algo más del enunciado antes de la entrega
+  final del domingo.
+- Limpiar los datos residuales de pruebas en la base de datos de
+  desarrollo antes de la demo.
