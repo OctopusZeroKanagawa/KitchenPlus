@@ -1,13 +1,8 @@
 # KitchenPlus — Sistema E: Pedidos y cocina de restaurante
 
-Prueba técnica individual del curso de Técnicas de Empleabilidad.
 Sistema de gestión de pedidos y cocina para un restaurante: crear
 pedidos, seguir la cola de cocina en tiempo (casi) real, y cobrar la
 cuenta de una mesa con pagos parciales.
-
-Ver `AGENTS.md` para el contexto completo del proyecto, `ASSUMPTIONS.md`
-para los supuestos asumidos, `docs/ADR/` para las decisiones de diseño,
-y `BITACORA-IA.md` para el registro de sesiones de trabajo con IA.
 
 ## Stack técnico
 
