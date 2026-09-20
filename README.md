@@ -1,4 +1,4 @@
-# KitchenPlus — Sistema E: Pedidos y cocina de restaurante
+# KitchenPlus — Pedidos y cocina de restaurante
 
 Sistema de gestión de pedidos y cocina para un restaurante: crear
 pedidos, seguir la cola de cocina en tiempo (casi) real, y cobrar la
