@@ -339,6 +339,235 @@ function ColaCocina() {
   )
 }
 
+function PagarMesa() {
+  const [mesas, setMesas] = useState([])
+  const [selectedMesaId, setSelectedMesaId] = useState('')
+  const [cuenta, setCuenta] = useState(null)
+  const [loadingMesas, setLoadingMesas] = useState(true)
+  const [loadingCuenta, setLoadingCuenta] = useState(false)
+  const [processing, setProcessing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+
+  useEffect(() => {
+    const fetchMesas = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/mesas/')
+        if (!response.ok) {
+          throw new Error('No se pudieron cargar las mesas.')
+        }
+
+        const data = await response.json()
+        setMesas(Array.isArray(data) ? data : [])
+        if (data.length > 0) {
+          setSelectedMesaId(String(data[0].id))
+        }
+      } catch (error) {
+        setErrorMessage(error.message)
+      } finally {
+        setLoadingMesas(false)
+      }
+    }
+
+    fetchMesas()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedMesaId) {
+      setCuenta(null)
+      return
+    }
+
+    const fetchCuenta = async () => {
+      setLoadingCuenta(true)
+      setErrorMessage('')
+      setSuccessMessage('')
+
+      try {
+        const response = await fetch(`http://localhost:8000/api/mesas/${selectedMesaId}/cuenta/`)
+        if (!response.ok) {
+          throw new Error('No se pudo cargar la cuenta de la mesa.')
+        }
+
+        const data = await response.json()
+        setCuenta(data)
+      } catch (error) {
+        setErrorMessage(error.message)
+      } finally {
+        setLoadingCuenta(false)
+      }
+    }
+
+    fetchCuenta()
+  }, [selectedMesaId])
+
+  const pagarPedido = async (pedido) => {
+    if (!selectedMesaId) {
+      return
+    }
+
+    setProcessing(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const response = await fetch('http://localhost:8000/api/pagos/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mesa: Number(selectedMesaId),
+          pedido: pedido.id,
+          monto: Number(pedido.subtotal),
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const message = Array.isArray(data.detail)
+          ? data.detail.join(', ')
+          : data.detail || 'No se pudo pagar este pedido.'
+        throw new Error(message)
+      }
+
+      const updated = await fetch(`http://localhost:8000/api/mesas/${selectedMesaId}/cuenta/`)
+      if (!updated.ok) {
+        throw new Error('No se pudo recargar la cuenta de la mesa.')
+      }
+
+      const cuentaData = await updated.json()
+      setCuenta(cuentaData)
+      setSuccessMessage(`Pedido ${pedido.id} pagado correctamente.`)
+    } catch (error) {
+      setErrorMessage(error.message)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const pagarTotalMesa = async () => {
+    if (!selectedMesaId || !cuenta || Number(cuenta.total_pendiente) <= 0) {
+      return
+    }
+
+    setProcessing(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const response = await fetch('http://localhost:8000/api/pagos/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mesa: Number(selectedMesaId),
+          monto: Number(cuenta.total_pendiente),
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const message = Array.isArray(data.detail)
+          ? data.detail.join(', ')
+          : data.detail || 'No se pudo pagar el total de la mesa.'
+        throw new Error(message)
+      }
+
+      const updated = await fetch(`http://localhost:8000/api/mesas/${selectedMesaId}/cuenta/`)
+      if (!updated.ok) {
+        throw new Error('No se pudo recargar la cuenta de la mesa.')
+      }
+
+      const cuentaData = await updated.json()
+      setCuenta(cuentaData)
+      setSuccessMessage('Pago total de la mesa realizado correctamente.')
+    } catch (error) {
+      setErrorMessage(error.message)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const pedidosPendientes = cuenta?.pedidos || []
+
+  return (
+    <div className="cocina-container">
+      <h1>Pagar mesa</h1>
+
+      {loadingMesas ? (
+        <p>Cargando mesas...</p>
+      ) : (
+        <label className="field-group">
+          <span>Mesa</span>
+          <select value={selectedMesaId} onChange={(event) => setSelectedMesaId(event.target.value)}>
+            {mesas.map((mesa) => (
+              <option key={mesa.id} value={mesa.id}>
+                Mesa {mesa.numero}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {errorMessage && <div className="message error">{errorMessage}</div>}
+      {successMessage && <div className="message success">{successMessage}</div>}
+
+      {loadingCuenta ? (
+        <p>Cargando cuenta...</p>
+      ) : !cuenta ? (
+        <p>No hay mesa seleccionada.</p>
+      ) : pedidosPendientes.length === 0 ? (
+        <p>Esta mesa no tiene cuenta pendiente.</p>
+      ) : (
+        <div className="cuenta-container">
+          <h2>Cuenta pendiente</h2>
+
+          <ul className="cola-list">
+            {pedidosPendientes.map((pedido) => (
+              <li key={pedido.id} className="cola-item">
+                <div className="cola-item-header">
+                  <strong>Pedido #{pedido.id}</strong>
+                  <span className="cantidad-badge">€{Number(pedido.subtotal).toFixed(2)}</span>
+                </div>
+
+                <div className="cola-item-meta">
+                  <span>Subtotal: €{Number(pedido.subtotal).toFixed(2)}</span>
+                </div>
+
+                <button
+                  type="button"
+                  className="advance-button"
+                  onClick={() => pagarPedido(pedido)}
+                  disabled={processing}
+                >
+                  Pagar este pedido
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className="cuenta-resumen">
+            <strong>Total pendiente: €{Number(cuenta.total_pendiente).toFixed(2)}</strong>
+            {/* El monto se calcula automáticamente desde cuenta.total_pendiente; el error de 'monto insuficiente' del backend solo puede ocurrir si se llama a la API directamente con un monto distinto, no desde este botón. */}
+            <button
+              type="button"
+              className="advance-button"
+              onClick={pagarTotalMesa}
+              disabled={processing}
+            >
+              Pagar total de la mesa
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -347,12 +576,14 @@ function App() {
           CrearPedido
         </NavLink>
         <NavLink to="/cocina">ColaCocina</NavLink>
+        <NavLink to="/pagar">PagarMesa</NavLink>
       </nav>
 
       <main className="page-shell">
         <Routes>
           <Route path="/" element={<CrearPedido />} />
           <Route path="/cocina" element={<ColaCocina />} />
+          <Route path="/pagar" element={<PagarMesa />} />
         </Routes>
       </main>
     </BrowserRouter>
