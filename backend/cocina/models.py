@@ -21,6 +21,7 @@ class Plato(models.Model):
     def __str__(self):
         return self.nombre
 
+    @property
     def disponible(self):
         for rp in self.recetaplato_set.all():
             if rp.ingrediente.cantidad_disponible < rp.cantidad_requerida:

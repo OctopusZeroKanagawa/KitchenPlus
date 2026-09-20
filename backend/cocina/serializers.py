@@ -21,14 +21,11 @@ class ItemPedidoSerializer(serializers.ModelSerializer):
 
 
 class PlatoSerializer(serializers.ModelSerializer):
-    disponible = serializers.SerializerMethodField()
+    disponible = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Plato
         fields = ('id', 'nombre', 'precio', 'disponible')
-
-    def get_disponible(self, obj):
-        return bool(obj.disponible)
 
 
 class PedidoSerializer(serializers.ModelSerializer):
