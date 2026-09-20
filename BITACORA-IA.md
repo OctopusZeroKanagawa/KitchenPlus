@@ -293,3 +293,34 @@ cola de cocina → cambiar estado de un ítem.
   final del domingo.
 - Limpiar los datos residuales de pruebas en la base de datos de
   desarrollo antes de la demo.
+
+## Sesión 5 — [20 de Septiembre del 2026]
+
+**Herramienta:** GitHub Copilot (Agent Mode, VS Code)
+
+**Se pidió:** limpiar la base de datos de desarrollo y crear un
+management command de seed con datos realistas para la demo,
+incluyendo deliberadamente un ingrediente sin stock para poder
+demostrar en vivo la regla de disponibilidad de platos.
+
+**Qué se encontró:** al sembrar ese caso de prueba, el plato
+correspondiente seguía apareciendo como `disponible: true`. Se
+descubrió que `Plato.disponible` en el modelo había perdido el
+decorador `@property` en algún punto entre sesiones anteriores (no
+se identificó en cuál exactamente), haciendo que `bool(obj.disponible)`
+evaluara siempre un objeto método, que en Python siempre es "verdadero".
+Este bug llevaba tiempo sin detectarse porque ninguna sesión anterior
+volvió a probar explícitamente el caso de un plato sin stock después
+de las primeras verificaciones.
+
+**Qué se corrigió:** se restauró el `@property`, y se simplificó
+`PlatoSerializer.disponible` a un `BooleanField` plano. Se verificó
+contra la suite completa de tests (8/8 pasando) y con curl, antes de
+comitear el fix por separado del seed de demo.
+
+**Lección:** un caso de prueba "no crítico" (un plato sin stock) que
+no se revisita periódicamente puede ocultar una regresión silenciosa
+durante varias sesiones. Vale la pena, de cara a la defensa, volver a
+probar manualmente cada regla de negocio una vez más antes de la
+entrega final, no asumir que "ya se verificó una vez" sigue siendo
+cierto después de ediciones posteriores al mismo código.
